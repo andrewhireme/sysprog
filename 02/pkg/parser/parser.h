@@ -54,15 +54,23 @@ ssize_t getRawCmdLine(char** cmdLine, size_t* size, FILE* stream) {
   return cmdSize-1;
 }
 
+bool Delim(const char c) {
+  return c == '|' || 
+         c == '&' ||
+         c == '>' ||
+         c == ' ' ||
+         c == '&';
+}
+
 ssize_t getCmds(Cmds** cmds, size_t* n, FILE* stream) {
   char* rawCmdLine = NULL;
   size_t size = 0;
   getRawCmdLine(&rawCmdLine, &size, stream);
 
-  char* token = Strtok(rawCmdLine);
+  char* token = Strtok(rawCmdLine, Delim);
   while (token != NULL) {
     printf("+%s+\n", token);
-    token = Strtok(NULL); 
+    token = Strtok(NULL, Delim); 
   }
   return 0;
 }

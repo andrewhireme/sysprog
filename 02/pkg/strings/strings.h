@@ -23,81 +23,6 @@ void changeStateIfQuote(const char c, enum State* state) {
   return;
 }
 
-// Removes backslash like a champ.
-void removeBackslash(char* s, enum State* state) {
-  if (strlen(s) < 1) {
-    return;
-  }
- 
-  size_t i = 0;
-  for (; i < strlen(s); ++i) {
-    char c = s[i];
-    changeStateIfQuote(c, state); 
-    if (*state == Outside && c == '\\') {
-      if (s[i+1] == '\n') {
-        memcpy(s + i, s + i + 2, strlen(s + i + 1)); 
-        i += 2;
-      } else {
-        memcpy(s + i, s + i + 1, strlen(s + i));
-        ++i;
-      }
-      break;
-    }
-  }
-  return removeBackslash(s + i, state);
-}
-
-// Removes outside quotation marks in s.
-void removeQuote(char* s) {
-  enum State state = Outside;
-
-  size_t len = strlen(s);
-
-  size_t qStart = 0;
-  for (; qStart < len && state == Outside; ++qStart) {
-    char c = s[qStart];
-    if (c == '\\') {
-      ++qStart;
-      continue;
-    }
-    if (c == '\'' || c == '\"') {
-      state = c;
-      break;
-    }
-  }
-  if (qStart == len) {
-    return;
-  }
-
-
-  size_t qStop = qStart + 1;
-  for (; qStop < len; ++qStop) {
-    char c = s[qStop];
-    if (c == '\\' && state == doubleQuote) {
-      ++qStop;
-      continue;
-    }
-    if (c == state) {
-      break;
-    }
-  }
-  memcpy(s + qStart, s + qStart + 1, qStop - qStart - 1);
-  memcpy(s + qStop - 1, s + qStop + 1, strlen(s) - qStop + 1);
-  removeQuote(s + qStop - 1);
-}
-
-void handleOutsideBackslash(char* s) {
-  if (s[0] != '\\') {
-    return;
-  }
-
-  if (s[1] == '\n') {
-    memcpy(s, s + 2, strlen(s + 1));
-  } else {
-    memcpy(s, s + 1, strlen(s));
-  }
-}
-
 // Cleans s according to Bash grammar for future use in execvp.
 void cleanString(char* s) {
   enum State state = Outside;
@@ -142,7 +67,20 @@ void cleanString(char* s) {
   }
 }
 
-char* Strtok(char* s) {
+const char Operators[] = {'|', '>', '&'};
+
+bool isOperator(const char c) {
+  for (size_t i = 0; i < sizeof(Operators); ++i) {
+    if (c == Operators[i]) {
+      return true;
+    }
+  }
+  return false;
+}
+
+typedef bool (*func)(const char);
+
+char* Strtok(char* s, func delim) {
   static char* input = NULL;
   if (s != NULL) {
     input = s;
@@ -157,26 +95,47 @@ char* Strtok(char* s) {
   }
   fieldStart = i;
 
+  if (isOperator(input[i])) {
+    char* res = malloc(3);
+    if (input[i] == input[i+1]) {
+      memcpy(res, input + i, 2);
+      res[2] = '\0';
+      input += 2;
+    } else {
+      memcpy(res, input + i, 1);
+      res[1] = '\0';
+      ++input;
+    }
+    return res;
+  }
+
   enum State state = Outside;
   for (; i < strlen(input); ++i) {
     if (input[i] == '\\' && (state == Outside || state == doubleQuote)) {
       ++i;
       continue;
     }
-    if (isSpace(input[i]) && state==Outside) {
-      input[i] = '\0';
-      char* res = input + fieldStart;
-      input += i + 1;
-      cleanString(res);
-      return res;
+    if (state == Outside) {
+      if (isSpace(input[i]) || isOperator(input[i])) {
+        size_t n = i - fieldStart;
+        char* res = malloc(n + 1);
+        memcpy(res, input + fieldStart, n);
+        res[n] = '\0';
+        cleanString(res);
+        input += i;
+        return res;
+      }
     }
     changeStateIfQuote(input[i], &state);
   }
 
   if (fieldStart < strlen(input)) {
-    char* res = input + fieldStart;
-    input = NULL;
+    size_t n = i - fieldStart;
+    char* res = malloc(n + 1);
+    memcpy(res, input + fieldStart, n);
+    res[n] = '\0';
     cleanString(res);
+    input = NULL;
     return res;
   }
   input = NULL;

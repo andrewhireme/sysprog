@@ -5,3 +5,7 @@ compile: main.c ./pkg/parser/parser.h ./pkg/strings/strings.h
 
 run: compile
 	./bin/main
+
+test: test.c ./pkg/parser/parser.h
+	gcc test.c -o test
+	./test
