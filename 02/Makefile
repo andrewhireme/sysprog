@@ -16,13 +16,13 @@ all: test
 
 build: $(EXECUTABLE)
 
-$(EXECUTABLE): $(OBJS) main.c
+$(EXECUTABLE): $(OBJS)
 	$(CC) $(LDFLAGS) $(OBJS) -o $@
 
 .c.o:
 	$(CC) $(CFLAGS) -c $< -o $@
 
-test: build checker.py
+test: build
 	python checker.py -e ./$(EXECUTABLE) --max=25
 
 clean:
