@@ -5,10 +5,6 @@
 
 enum State{singleQuote='\'', doubleQuote='\"', Outside=-1};
 
-bool isSpace(const char c) {
-  return c == ' ' || c == '\t';
-}
-
 void changeStateIfQuote(const char c, enum State* state) {
   //only if we get out of the quotation
   if (c == *state) {    
@@ -23,65 +19,71 @@ void changeStateIfQuote(const char c, enum State* state) {
   return;
 }
 
-// Cleans s according to Bash grammar for future use in execvp.
+// Cleans s according to Bash grammar rules for future use in execvp.
 void cleanString(char* s) {
   enum State state = Outside;
   size_t i = 0;
   while (i < strlen(s)) {
     changeStateIfQuote(s[i], &state);
-    for (; i < strlen(s) && state == Outside; ++i) {
-      if (s[i] == '\\') {
-        if (s[i+1] == '\n') {
-          memcpy(s + i, s + i + 2, strlen(s + i + 1));
-        } else {
-          memcpy(s + i, s + i + 1, strlen(s + i)); 
-        }
-        continue;
-      }
-      changeStateIfQuote(s[i], &state);
-    }
-
-    if (s[i] == doubleQuote) {
-      memcpy(s + i, s + i + 1, strlen(s + i));
-      for (; i < strlen(s) && state == doubleQuote; ++i) {
+    if (state == Outside) {
+      for (; i < strlen(s); ++i) {
         if (s[i] == '\\') {
           if (s[i+1] == '\n') {
-            memcpy(s + i, s + i + 2, strlen(s + i + 1));
-          } else if (s[i+1] == '\"') {
-            memcpy(s + i, s + i + 1, strlen(s + i)); 
+            memmove(s + i, s + i + 2, strlen(s + i + 1));
+          } else {
+            memmove(s + i, s + i + 1, strlen(s + i)); 
           }
           continue;
         }
         changeStateIfQuote(s[i], &state);
+        if (state != Outside) {
+          break;
+        }
       }
-      memcpy(s + i - 1, s + i, strlen(s + i - 1));
-    }
-    
-    if (s[i] == singleQuote) {
-      memcpy(s + i, s + i + 1, strlen(s + i));
+    } else if (state == doubleQuote) {
+      memmove(s + i, s + i + 1, strlen(s + i));
+      for (; i < strlen(s); ++i) {
+        if (s[i] == '\\') {
+          if (s[i+1] == '\\') {
+            memmove(s + i, s + i + 1, strlen(s + i));
+          } else if (s[i+1] == '\n') {
+            memmove(s + i, s + i + 2, strlen(s + i + 1));
+          } else if (s[i+1] == '\"') {
+            memmove(s + i, s + i + 1, strlen(s + i)); 
+          }
+          continue;
+        }
+        changeStateIfQuote(s[i], &state);
+        if (state != doubleQuote) {
+          break;
+        }
+      }
+      memmove(s + i, s + i + 1, strlen(s + i));
+    } else if (state == singleQuote) {
+      memmove(s + i, s + i + 1, strlen(s + i));
       for (; i < strlen(s) && state == singleQuote; ++i) {
         changeStateIfQuote(s[i], &state);
+        if (state != singleQuote) {
+          break;
+        }
       }
-      memcpy(s + i - 1, s + i, strlen(s + i -1));
+      memmove(s + i, s + i + 1, strlen(s + i));
     }
   }
 }
 
-const char Operators[] = {'|', '>', '&'};
-
-bool isOperator(const char c) {
-  for (size_t i = 0; i < sizeof(Operators); ++i) {
-    if (c == Operators[i]) {
-      return true;
-    }
-  }
-  return false;
+bool isSpace(const char c) {
+  return c == ' ' || c == '\t';
 }
 
 typedef bool (*func)(const char);
 
-char* Strtok(char* s, func delim) {
-  static char* input = NULL;
+// Strtok splits the string s at each run of ASCII code points c satisfying func(c). 
+// Delimiters are also returned except for the whitecpace characters.
+// Returned tokens are processed to follow Bash (Bourne Again Shell) grammar rules.
+// Doesn't modify the origin string s. Each returned token must be freed. 
+char* Strtok(const char* s, func delim) {
+  static const char* input = NULL;
   if (s != NULL) {
     input = s;
   }
@@ -95,16 +97,16 @@ char* Strtok(char* s, func delim) {
   }
   fieldStart = i;
 
-  if (isOperator(input[i])) {
+  if (delim(input[i])) {
     char* res = malloc(3);
     if (input[i] == input[i+1]) {
-      memcpy(res, input + i, 2);
+      memmove(res, input + i, 2);
       res[2] = '\0';
-      input += 2;
+      input += i + 2;
     } else {
-      memcpy(res, input + i, 1);
+      memmove(res, input + i, 1);
       res[1] = '\0';
-      ++input;
+      input += i + 1;
     }
     return res;
   }
@@ -116,10 +118,10 @@ char* Strtok(char* s, func delim) {
       continue;
     }
     if (state == Outside) {
-      if (isSpace(input[i]) || isOperator(input[i])) {
+      if (delim(input[i])) {
         size_t n = i - fieldStart;
         char* res = malloc(n + 1);
-        memcpy(res, input + fieldStart, n);
+        memmove(res, input + fieldStart, n);
         res[n] = '\0';
         cleanString(res);
         input += i;
@@ -132,7 +134,7 @@ char* Strtok(char* s, func delim) {
   if (fieldStart < strlen(input)) {
     size_t n = i - fieldStart;
     char* res = malloc(n + 1);
-    memcpy(res, input + fieldStart, n);
+    memmove(res, input + fieldStart, n);
     res[n] = '\0';
     cleanString(res);
     input = NULL;

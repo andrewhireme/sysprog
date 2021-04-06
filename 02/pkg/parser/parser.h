@@ -1,24 +1,22 @@
 #include "../strings/strings.h"
 
-typedef struct Cmd {
-  const char* command;
-  const char** argv;
-  int argc;
-} Cmd;
+typedef enum Type{Command, Operator} Type;
 
-typedef struct Cmds {
-  Cmd* cmd;
-  int n;
-} Cmds;
+typedef struct Cmd {
+  Type type;
+  char* command;
+  char**  argv;
+  size_t argc;
+} Cmd;
 
 // Reads entire line from stream, storing the address of the buffer into *lineptr. 
 // Continues reading if the newline character was met inside double or single quotes or followed by backslash character.
-ssize_t getRawCmdLine(char** cmdLine, size_t* size, FILE* stream) {
+ssize_t getRawCmdLine(char** lineptr, FILE* stream) {
   ssize_t cmdSize = 1;
-  if (*cmdLine == NULL) {
-    *cmdLine = malloc(cmdSize);
+  if (*lineptr == NULL) {
+    *lineptr = malloc(cmdSize);
   }
-  (*cmdLine)[0] = '\0';
+  (*lineptr)[0] = '\0';
 
   enum State state = Outside;
   bool next;
@@ -26,9 +24,11 @@ ssize_t getRawCmdLine(char** cmdLine, size_t* size, FILE* stream) {
     next = false;
     char* line = NULL;
     size_t n = 0;
-    size_t len = getline(&line, &n, stream);
-    
-    for (size_t i = 0; i < len; ++i) {
+    ssize_t len = getline(&line, &n, stream);
+    if (len == -1) {
+      return len;
+    }
+    for (int i = 0; i < len; ++i) {
       char c = line[i];
       if (c == '\\' && (state == Outside || state == doubleQuote)) {
         ++i;
@@ -40,37 +40,151 @@ ssize_t getRawCmdLine(char** cmdLine, size_t* size, FILE* stream) {
       next = true; 
     } 
     cmdSize += len;
-    char* newCmdLine = realloc(*cmdLine, cmdSize);
+    char* newCmdLine = realloc(*lineptr, cmdSize);
     if (newCmdLine == NULL) {
       exit(1);
     }
-    *cmdLine = newCmdLine;
-    strcat(*cmdLine, line);
+    *lineptr = newCmdLine;
+    strcat(*lineptr, line);
   } while (next);
-  if(cmdSize > 1) {
-    (*cmdLine)[cmdSize-2] = '\0';
-    return cmdSize-2;
+
+  size_t len = strlen(*lineptr);
+  if((*lineptr)[len - 1] == '\n') {
+    (*lineptr)[len-1] = '\0';
   }
-  return cmdSize-1;
+  return strlen(*lineptr);
 }
 
-bool Delim(const char c) {
+bool isOperator(const char c) {
   return c == '|' || 
          c == '&' ||
          c == '>' ||
          c == ' ' ||
-         c == '&';
+         c == '&' ||
+         c == '#';
 }
 
-ssize_t getCmds(Cmds** cmds, size_t* n, FILE* stream) {
-  char* rawCmdLine = NULL;
-  size_t size = 0;
-  getRawCmdLine(&rawCmdLine, &size, stream);
-
-  char* token = Strtok(rawCmdLine, Delim);
-  while (token != NULL) {
-    printf("+%s+\n", token);
-    token = Strtok(NULL, Delim); 
+ssize_t cmdResize(Cmd** p, size_t* cap) {
+  size_t newCap = (*cap + 1) * 2;
+  size_t newSize = newCap * sizeof(Cmd);
+  Cmd* np = realloc(*p, newSize);
+  if (np == NULL) {
+    return -1; 
   }
+  *p = np;
+  *cap = newCap;
   return 0;
+}
+
+ssize_t strResize(char*** p, size_t* cap) {
+  size_t newCap = (*cap + 1) * 2;
+  size_t newSize = newCap * sizeof(char*);
+  char** np = realloc(*p, newSize);
+  if (np == NULL) {
+    return -1; 
+  }
+  *p = np;
+  *cap = newCap;
+  return 0;
+}
+
+void cmdFree(Cmd* cmd, size_t count) {
+  for (size_t i = 0; i < count; ++i) {
+    free(cmd[i].command);
+    for (size_t j = 1; j < cmd[i].argc; ++j) {
+      free((cmd[i].argv)[j]);
+    }
+    free(cmd[i].argv);
+  }
+}
+
+ssize_t cmdFill(Cmd* cmd, char** cmdToken, Type type) {
+  char* token = *cmdToken;
+  cmd->type = type;
+  cmd->command = token; 
+  cmd->argv = NULL;
+  cmd->argc = 0;
+
+  char** p = NULL;
+  if (type == Command) {
+    size_t count = 0, cap = 0;
+    ssize_t err = strResize(&p, &cap);
+    if (err == -1) {
+      return err;
+    }
+    p[count++] = token;
+
+    token = Strtok(NULL, isOperator);
+    while (token != NULL && !isOperator(*token)) {
+      if (count + 1 > cap) {
+        err = strResize(&p, &cap);
+        if (err == -1) {
+          for (size_t j = 0; j < count; ++j) {
+            free(p[j]);
+          }
+          free(p);
+          return err;
+        }
+      }
+      p[count++] = token;
+      token = Strtok(NULL, isOperator); 
+    }
+    if (count + 1 > cap) {
+      err = strResize(&p, &cap);
+      if (err == -1) {
+        for (size_t j = 0; j < count; ++j) {
+          free(p[j]);
+        }
+        free(p);
+        return err;
+      }
+    }
+    p[count] = NULL;
+    cmd->argc = count;
+    cmd->argv = p;
+  } else {
+    token = Strtok(NULL, isOperator); 
+  }
+  *cmdToken = token;
+  return 0;
+}
+
+ssize_t getCmds(Cmd** cmds, FILE* stream) {
+  char* rawCmdLine = NULL;
+  ssize_t len = getRawCmdLine(&rawCmdLine, stream);
+  if (len == -1 || len == 0) {
+    return -1;
+  }
+
+  Cmd* lcmds = NULL;
+  size_t count = 0, cap = 0;
+
+  char* token = Strtok(rawCmdLine, isOperator);
+  while (token != NULL) {
+    if (count + 1 > cap) {
+      ssize_t err = cmdResize(&lcmds, &cap);
+      if (err == -1) {
+        cmdFree(lcmds, count);
+        return err;
+      }
+    }
+    if (*token == '#') {
+      free(token);
+      break; 
+    }
+    ssize_t err = 0; 
+    if (isOperator(*token)) {
+      err = cmdFill(&(lcmds[count]), &token, Operator); 
+    } else {
+      err = cmdFill(&(lcmds[count]), &token, Command); 
+    }
+    if (err == -1) {
+      cmdFree(lcmds, count);
+      return err;
+    }
+    ++count;
+  }
+  *cmds = lcmds;
+  free(rawCmdLine);
+  return count;
 }

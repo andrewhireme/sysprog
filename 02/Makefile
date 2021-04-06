@@ -1,11 +1,31 @@
-all: run
+CC	=  cc
+CFLAGS	=  -I .
+CFLAGS	+= -W -Wall -Wextra -Werror -Wfloat-equal
+CFLAGS	+= -Wundef -Wpointer-arith -Wcast-align -Wshadow
+CFLAGS	+= -Wstrict-overflow=5 -Wwrite-strings -Waggregate-return
+CFLAGS	+= -Wswitch-enum -Wunreachable-code -Winit-self
+CFLAGS	+= -Wno-unused-parameter -pedantic -O3
+LDFLAGS	=
 
-compile: main.c ./pkg/parser/parser.h ./pkg/strings/strings.h
-	gcc -g3 -o ./bin/main main.c
+BASE_SOURCES    = main.c
+SOURCES		= $(BASE_SOURCES)
+OBJS		= $(SOURCES:.c=.o)
+EXECUTABLE	= task_2
 
-run: compile
-	./bin/main
+all: test
 
-test: test.c ./pkg/parser/parser.h
-	gcc test.c -o test
-	./test
+build: $(EXECUTABLE)
+
+$(EXECUTABLE): $(OBJS) main.c
+	$(CC) $(LDFLAGS) $(OBJS) -o $@
+
+.c.o:
+	$(CC) $(CFLAGS) -c $< -o $@
+
+test: build checker.py
+	python checker.py -e ./$(EXECUTABLE) --max=25
+
+clean:
+	rm -rf $(EXECUTABLE) $(OBJS)
+
+.PHONY: clean
