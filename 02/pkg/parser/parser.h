@@ -26,6 +26,8 @@ ssize_t getRawCmdLine(char** lineptr, FILE* stream) {
     size_t n = 0;
     ssize_t len = getline(&line, &n, stream);
     if (len == -1) {
+      free(*lineptr);
+      *lineptr = NULL;
       return len;
     }
     for (int i = 0; i < len; ++i) {
@@ -42,7 +44,9 @@ ssize_t getRawCmdLine(char** lineptr, FILE* stream) {
     cmdSize += len;
     char* newCmdLine = realloc(*lineptr, cmdSize);
     if (newCmdLine == NULL) {
-      exit(1);
+      free(*lineptr);
+      *lineptr = NULL;
+      return -1;
     }
     *lineptr = newCmdLine;
     strcat(*lineptr, line);
@@ -96,6 +100,7 @@ void cmdFree(Cmd* cmd, size_t count) {
     }
     free(cmd[i].argv);
   }
+  free(cmd);
 }
 
 ssize_t cmdFill(Cmd* cmd, char** cmdToken, Type type) {
@@ -153,6 +158,7 @@ ssize_t getCmds(Cmd** cmds, FILE* stream) {
   char* rawCmdLine = NULL;
   ssize_t len = getRawCmdLine(&rawCmdLine, stream);
   if (len == -1 || len == 0) {
+    free(rawCmdLine);
     return -1;
   }
 
@@ -165,6 +171,7 @@ ssize_t getCmds(Cmd** cmds, FILE* stream) {
       ssize_t err = cmdResize(&lcmds, &cap);
       if (err == -1) {
         cmdFree(lcmds, count);
+        free(rawCmdLine);
         return err;
       }
     }
@@ -180,6 +187,8 @@ ssize_t getCmds(Cmd** cmds, FILE* stream) {
     }
     if (err == -1) {
       cmdFree(lcmds, count);
+      free(token);
+      free(rawCmdLine);
       return err;
     }
     ++count;
