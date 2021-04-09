@@ -12,12 +12,11 @@
 
 void terminateIfError(const char* msg, int err) {
   if (err == -1) {
-    perror(msg);
     exit(EXIT_FAILURE);
   }
 }
 
-void runCmd(const Cmd* cmds, ssize_t n) {
+void runCmd(Cmd* cmds, ssize_t n) {
   if (n < 1) {
     return;
   }
@@ -45,7 +44,9 @@ void runCmd(const Cmd* cmds, ssize_t n) {
           dup2(in, STDIN_FILENO);
         }
         err = execvp(cmds[i].command, cmds[i].argv);
-        terminateIfError("execvp", err);
+        if (err != -1) {
+          exit(EXIT_FAILURE);
+        }
       }
       int locStatus;
       err = waitpid(pid, &locStatus, 0);
@@ -71,7 +72,7 @@ void runCmd(const Cmd* cmds, ssize_t n) {
         }
         dup2(fd[1], STDOUT_FILENO);
         err = execvp(cmds[i].command, cmds[i].argv);
-        if (err == -1) {
+        if (err != -1) {
           exit(EXIT_FAILURE);
         }
       }
@@ -98,7 +99,9 @@ void runCmd(const Cmd* cmds, ssize_t n) {
         }
         dup2(fd[1], STDOUT_FILENO);
         err = execvp(cmds[i].command, cmds[i].argv);
-        terminateIfError("execvp", err);
+        if (err != -1) {
+          exit(EXIT_FAILURE);
+        }
       } 
       err = close(fd[1]);
       terminateIfError("file", err);
@@ -127,7 +130,9 @@ void runCmd(const Cmd* cmds, ssize_t n) {
         }
         dup2(fd[1], STDOUT_FILENO);
         err = execvp(cmds[i].command, cmds[i].argv);
-        terminateIfError("execvp", err);
+        if (err != -1) {
+          exit(EXIT_FAILURE);
+        }
       } 
       err = close(fd[1]);
       terminateIfError("file", err);
@@ -155,7 +160,8 @@ void runCmd(const Cmd* cmds, ssize_t n) {
           dup2(in, STDIN_FILENO);
         }
         if (execvp(cmds[i].command, cmds[i].argv) == -1) {
-          exit(1);
+          cmdFree(cmds, n);
+          exit(EXIT_FAILURE);
         }; 
       }
       err = waitpid(pid, &status, 0);

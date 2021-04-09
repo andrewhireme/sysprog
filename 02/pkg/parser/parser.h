@@ -27,6 +27,7 @@ ssize_t getRawCmdLine(char** lineptr, FILE* stream) {
     ssize_t len = getline(&line, &n, stream);
     if (len == -1) {
       free(*lineptr);
+      free(line);
       *lineptr = NULL;
       return len;
     }
@@ -50,6 +51,7 @@ ssize_t getRawCmdLine(char** lineptr, FILE* stream) {
     }
     *lineptr = newCmdLine;
     strcat(*lineptr, line);
+    free(line);
   } while (next);
 
   size_t len = strlen(*lineptr);
