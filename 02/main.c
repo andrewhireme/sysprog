@@ -44,7 +44,7 @@ void runCmd(Cmd* cmds, ssize_t n) {
           dup2(in, STDIN_FILENO);
         }
         err = execvp(cmds[i].command, cmds[i].argv);
-        if (err != -1) {
+        if (err == -1) {
           exit(EXIT_FAILURE);
         }
       }
@@ -72,7 +72,7 @@ void runCmd(Cmd* cmds, ssize_t n) {
         }
         dup2(fd[1], STDOUT_FILENO);
         err = execvp(cmds[i].command, cmds[i].argv);
-        if (err != -1) {
+        if (err == -1) {
           exit(EXIT_FAILURE);
         }
       }
@@ -99,7 +99,7 @@ void runCmd(Cmd* cmds, ssize_t n) {
         }
         dup2(fd[1], STDOUT_FILENO);
         err = execvp(cmds[i].command, cmds[i].argv);
-        if (err != -1) {
+        if (err == -1) {
           exit(EXIT_FAILURE);
         }
       } 
@@ -130,7 +130,7 @@ void runCmd(Cmd* cmds, ssize_t n) {
         }
         dup2(fd[1], STDOUT_FILENO);
         err = execvp(cmds[i].command, cmds[i].argv);
-        if (err != -1) {
+        if (err == -1) {
           exit(EXIT_FAILURE);
         }
       } 
