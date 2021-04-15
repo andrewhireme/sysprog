@@ -7,39 +7,39 @@
 #include <stdbool.h>
 
 enum {
-	BLOCK_SIZE = 512,
-	MAX_FILE_SIZE = 1024 * 1024 * 1024,
+  BLOCK_SIZE = 512,
+  MAX_FILE_SIZE = 1024 * 1024 * 1024,
 };
 
 /** Global error code. Set from any function on any error. */
 static enum ufs_error_code ufs_error_code = UFS_ERR_NO_ERR;
 
 struct block {
-	/** Block memory. */
-	char *memory;
-	/** How many bytes are occupied. */
-	int occupied;
-	/** Next block in the file. */
-	struct block *next;
-	/** Previous block in the file. */
-	struct block *prev;
+  /** Block memory. */
+  char *memory;
+  /** How many bytes are occupied. */
+  int occupied;
+  /** Next block in the file. */
+  struct block *next;
+  /** Previous block in the file. */
+  struct block *prev;
 };
 
 struct file {
-	/** Double-linked list of file blocks. */
-	struct block *block_list;
-	/**
-	 * Last block in the list above for fast access to the end
-	 * of file.
-	 */
-	struct block *last_block;
-	/** How many file descriptors are opened on the file. */
-	int refs;
-	/** File name. */
-	const char *name;
-	/** Files are stored in a double-linked list. */
-	struct file *next;
-	struct file *prev;
+  /** Double-linked list of file blocks. */
+  struct block *block_list;
+  /**
+   * Last block in the list above for fast access to the end
+   * of file.
+   */
+  struct block *last_block;
+  /** How many file descriptors are opened on the file. */
+  int refs;
+  /** File name. */
+  const char *name;
+  /** Files are stored in a double-linked list. */
+  struct file *next;
+  struct file *prev;
 
   int size;
 };
@@ -59,7 +59,7 @@ struct file* find_file(const char* name) {
 }
 
 struct filedesc {
-	struct file *file;
+  struct file *file;
 
   int id;
   int offset;
@@ -79,11 +79,15 @@ static int file_descriptor_capacity = 0;
 enum ufs_error_code
 ufs_errno()
 {
-	return ufs_error_code;
+  return ufs_error_code;
 }
 
 struct filedesc* create_filedesc(struct file* file) {
   struct filedesc* fd = malloc(sizeof(struct filedesc));
+  if (fd == NULL) {
+    perror("malloc");
+    exit(EXIT_FAILURE);
+  }
   fd->file = file;
   fd->offset = 0;
 
@@ -102,7 +106,8 @@ struct filedesc* create_filedesc(struct file* file) {
       int new_size = new_cap * sizeof(struct filedesc*);
       struct filedesc** new_filedesc = realloc(file_descriptors, new_size);
       if (new_filedesc == NULL) {
-        return NULL;
+        perror("malloc");
+        exit(EXIT_FAILURE);
       }
       file_descriptors = new_filedesc;
       file_descriptor_capacity = new_cap;
@@ -115,11 +120,19 @@ struct filedesc* create_filedesc(struct file* file) {
 
 struct file* create_file(const char* filename) {
   struct file* file = malloc(sizeof(struct file));
+  if (file == NULL) {
+    perror("malloc");
+    exit(EXIT_FAILURE);
+  }
   file->block_list = NULL;
   file->last_block = NULL;
   file->refs = 0;
 
   char* name = malloc(strlen(filename) + 1);
+  if (name == NULL) {
+    perror("malloc");
+    exit(EXIT_FAILURE);
+  }
   memcpy(name, filename, strlen(filename) + 1);
   file->name = name;
 
@@ -156,7 +169,7 @@ ufs_open(const char *filename, int flags)
   }
   fd->flag = flags == 0 ? UFS_READ_WRITE : flags;
   ++file->refs;
-	return fd->id;
+  return fd->id;
 }
 
 struct filedesc* find_filedesc(int fd) {
@@ -171,7 +184,15 @@ struct filedesc* find_filedesc(int fd) {
 
 struct block* create_block() {
   struct block* block = malloc(sizeof(struct block));
+  if (block == NULL) {
+    perror("malloc");
+    exit(EXIT_FAILURE);
+  }
   block->memory = malloc(BLOCK_SIZE);
+  if (block->memory == NULL) {
+    perror("malloc");
+    exit(EXIT_FAILURE);
+  }
   block->occupied = 0;
   block->next = NULL;
   block->prev = NULL;
@@ -254,7 +275,7 @@ ufs_write(int fd, const char *buf, size_t size)
   if (bytes_read != -1) {
     filedesc->offset += bytes_read;
   }
-	return bytes_read;
+  return bytes_read;
 }
 
 ssize_t 
@@ -302,7 +323,7 @@ ufs_read(int fd, char *buf, size_t size)
   if (read_bytes != -1) {
     filedesc->offset += read_bytes;
   }
-	return read_bytes;
+  return read_bytes;
 }
 
 void free_blocks(struct block* head) {
@@ -350,7 +371,7 @@ ufs_close(int fd)
     }
   }
   ufs_error_code = UFS_ERR_NO_FILE;
-	return -1;
+  return -1;
 }
 
 
@@ -373,8 +394,8 @@ ufs_delete(const char *filename)
     }
     return 0;
   }
-	ufs_error_code = UFS_ERR_NO_FILE;
-	return -1;
+  ufs_error_code = UFS_ERR_NO_FILE;
+  return -1;
 }
 
 void update_fildescs(struct file* file) {
