@@ -12,6 +12,7 @@
 
 void terminateIfError(const char* msg, int err) {
   if (err == -1) {
+    perror(msg);
     exit(EXIT_FAILURE);
   }
 }
