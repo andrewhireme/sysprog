@@ -111,9 +111,8 @@ test_thread_pool_delete(void)
 int
 main(void)
 {
-  setbuf(stdout, NULL);
-
   unit_test_start();
+
   test_new();
   test_push();
   test_thread_pool_delete();

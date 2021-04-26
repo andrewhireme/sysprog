@@ -22,6 +22,8 @@ enum thread_poool_errcode {
   TPOOL_ERR_TIMEOUT,
 };
 
+#define NEED_DETACH
+
 /** Thread pool API. */
 
 /**
@@ -36,7 +38,7 @@ enum thread_poool_errcode {
  *       or 0.
  */
 int
-thread_pool_new(int max_thread_count, struct thread_pool **pool);
+thread_pool_new(int max_thread_count, struct thread_pool** pool);
 
 /**
  * How many threads are created by this pool. Can be less than
@@ -45,7 +47,7 @@ thread_pool_new(int max_thread_count, struct thread_pool **pool);
  * @retval Thread count.
  */
 int
-thread_pool_thread_count(const struct thread_pool *pool);
+thread_pool_thread_count(const struct thread_pool* pool);
 
 /**
  * Delete @a pool, free its memory.
@@ -55,7 +57,7 @@ thread_pool_thread_count(const struct thread_pool *pool);
  *     - TPOOL_ERR_HAS_TASKS - pool still has tasks.
  */
 int
-thread_pool_delete(struct thread_pool *pool);
+thread_pool_delete(struct thread_pool* pool);
 
 /**
  * Push @a task into thread pool queue.
@@ -68,7 +70,7 @@ thread_pool_delete(struct thread_pool *pool);
  *       already.
  */
 int
-thread_pool_push_task(struct thread_pool *pool, struct thread_task *task);
+thread_pool_push_task(struct thread_pool* pool, struct thread_task* task);
 
 /** Thread pool task API. */
 
@@ -81,21 +83,21 @@ thread_pool_push_task(struct thread_pool *pool, struct thread_task *task);
  * @retval Always 0.
  */
 int
-thread_task_new(struct thread_task **task, thread_task_f function, void *arg);
+thread_task_new(struct thread_task** task, thread_task_f function, void* arg);
 
 /**
  * Check if @a task is finished and its result can be obtained.
  * @param task Task to check.
  */
 bool
-thread_task_is_finished(const struct thread_task *task);
+thread_task_is_finished(const struct thread_task* task);
 
 /**
  * Check if @a task is running right now.
  * @param task Task to check.
  */
 bool
-thread_task_is_running(const struct thread_task *task);
+thread_task_is_running(const struct thread_task* task);
 
 /**
  * Join the task. If it is not finished, then wait until it is.
@@ -109,7 +111,7 @@ thread_task_is_running(const struct thread_task *task);
  *     - TPOOL_ERR_TASK_NOT_PUSHED - task is not pushed to a pool.
  */
 int
-thread_task_join(struct thread_task *task, void **result);
+thread_task_join(struct thread_task* task, void** result);
 
 /**
  * Delete a task, free its memory.
@@ -121,7 +123,7 @@ thread_task_join(struct thread_task *task, void **result);
  *       is in a pool. Need to join it firstly.
  */
 int
-thread_task_delete(struct thread_task *task);
+thread_task_delete(struct thread_task* task);
 
 #ifdef NEED_DETACH
 
@@ -136,7 +138,7 @@ thread_task_delete(struct thread_task *task);
  *       pool.
 */
 int
-thread_task_detach(struct thread_task *task);
+thread_task_detach(struct thread_task* task);
 
 #endif
 
